@@ -9,32 +9,44 @@ import logging
 from IPy import IP
 
 class Trunker:
-    def __init__(self, vdevices, interface, persistance = False):
+    def __init__(self, vdevices, interface):
         # class vairables
         self.vdevices = int(vdevices)
         self.interface = interface
-        self.persistance = persistance
-
         logging.basicConfig(filename = "/root/site-data/logs/trunker.log", format="%(asctime)s %(message)s", level = logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
 
-        if self.persistance:
-            logging.info("Persistance flag set")
+    def interfaces_check(self):
+        try:
             if len(subprocess.Popen(["ls", "-a", "/etc/network/interfaces.orig"], stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()[0]) > 0:
-                logging.info("/etc/network/interfaces.orig already exists.")
-                pass
+                logging.info("/etc/network/interfaces.orig already exists")
+                logging.info("Appending devices to /etc/network/interfaces") 
+                raise ValueError
             else:
                 subprocess.Popen(["cp", "-p", "/etc/network/interfaces", "/etc/network/interfaces.orig"]).communicate()
+                logging.info("/etc/network/interfaces.orig does not exist")
                 logging.info("Copied /etc/network/interfaces -> /etc/network/interfaces.orig")
+                print("/etc/network/interfaces found.  Creating backup at /etc/network/interfaces.orig")
+        except ValueError:
+            print("/etc/network/interfaces.orig already exists")
+            print("Appending devices to /etc/network/interface")
+
 
     def add(self):
+        self.interfaces_check()
         for vlans in range(self.vdevices):
             vlan_num = vlans + 1
 
             while True:
                 try:
                     vlan_device_id = int(input(f"Enter VLAN ID {vlan_num}: "))
+                    if len(self.get_vlan_names()) > 0:
+                        if "eth0." + str(vlan_device_id) in self.get_vlan_names():
+                            raise NameError
                 except ValueError:
                     print("Invalid input.  Must be an integer")
+                    continue
+                except NameError:
+                    print(f"VLAN ID {vlan_device_id} Already Exist. Enter another")
                     continue
                 else:
                     break
@@ -70,12 +82,13 @@ class Trunker:
                 print(f"VLAN {vlan_device_name} created\nIP Address: {device_ip}/{device_cidr}")
                 logging.info(f"Virtual Device {vlan_device_name} created.  Assigned IP Address {device_ip}/{device_cidr}")
 
-            if self.persistance:
-                self.make_persist(vlan_device_name, device_ip, device_nm.netmask())
-
-    def delete(self):
+    def get_vlan_names(self):
         get_vlan_names = subprocess.Popen(["ls", "-a", "/proc/net/vlan"], stdout = subprocess.PIPE).communicate()[0]
         match_names = [s for s in get_vlan_names.decode("utf-8").split("\n") if "eth0." in s]
+        return match_names
+        
+    def delete(self):
+        match_names = self.get_vlan_names()
         for device in match_names:
             delete_vlan = subprocess.Popen(["ip", "link", "delete", device])
             print(f"Deleted: {device}")
@@ -85,6 +98,7 @@ class Trunker:
         logging.info("Moved /etc/network/interfaces.orig -> /etc/network/interfaces")
 
     def from_file(self, input_file):
+        self.interfaces_check()
         for line in input_file:
             vlan_device_id, device_ip, device_cidr = line.split(",")[0:3] 
             device_cidr = device_cidr.strip()
@@ -124,7 +138,6 @@ class Trunker:
                 logging.info(f"Assigned IP Address {device_ip}/{device_cidr}")
 
     def make_persist(self, vlan_device_name, device_ip, device_nm):
-        print(f"Adding VLAN device {vlan_device_name} to /etc/network/interfaces")
         logging.info(f"Adding VLAN device {vlan_device_name} to /etc/network/interfaces")
         with open("/etc/network/interfaces", "a+") as interfaces:
             interfaces.write("\n# VLAN device {} added by trunker\nauto {}\niface {} inet static\n\taddress {}\n\tnetmask {}\n\tvlan-raw-device {}\n".format(
@@ -163,6 +176,8 @@ class Trunker:
                                                  "dev", vlan_device_name])
         subprocess.Popen(["ip", "link", "set", vlan_device_name, "up"])
 
+        self.make_persist(vlan_device_name, device_ip, device_nm)
+
         return vlan_device_name
 
 def main():
@@ -174,13 +189,9 @@ def main():
     file_group.add_argument("-n", "--num", type = int, default = 1, help = "Number of VLAN devices needed (default: 1)")
     file_group.add_argument("-f", "--file", help="""Adds VLAN id's from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8""", type=argparse.FileType('r'))
     parser.add_argument("-i", "--inter", default = "eth0", help = "Specify which interface to add VLAN to")
-    parser.add_argument("-p", "--persistance", action="store_true", help="Make VLAN devices persist through reboot")
     args = parser.parse_args()
 
-    if args.persistance:
-        vlan_trunk = Trunker(args.num, args.inter, args.persistance)
-    else:
-        vlan_trunk = Trunker(args.num, args.inter)
+    vlan_trunk = Trunker(args.num, args.inter)
 
     if args.add:
         vlan_trunk.add()
