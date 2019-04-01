@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 
-# Need to figure out how to check vlan_device_id against create vlan devices.  Other wise the user won't get 
-# alerted that the device is in use until after they've submitted IP and CIDR.
-
 import argparse
 import subprocess
 import logging
