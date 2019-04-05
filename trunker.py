@@ -10,7 +10,20 @@ class Trunker:
         # class vairables
         self.vdevices = int(vdevices)
         self.interface = interface
-        logging.basicConfig(filename = "/root/site-data/logs/trunker.log", format="%(asctime)s %(message)s", level = logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+
+    def log_creation(self):
+        if len(subprocess.Popen(["ls", "/root/site-data/logs/"], stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()[1]) > 0:
+            while True:
+                try:
+                    print("/root/site-data/logs/ does not exist")
+                    log_file = input("Please enter a filepath for trunker.log: ")
+                    logging.basicConfig(filename = log_file + "/trunker.log", format="%(asctime)s %(message)s", level = logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+                    return print(f"{log_file}/trunker.log created. Logging started")
+                except FileNotFoundError:
+                    print(f"{log_file} does not exist. Enter another")
+                    continue
+        else:
+            logging.basicConfig(filename = "/root/site-data/logs/trunker.log", format="%(asctime)s %(message)s", level = logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
 
     def interfaces_check(self):
         try:
@@ -29,6 +42,7 @@ class Trunker:
 
 
     def add(self):
+        self.log_creation()
         self.interfaces_check()
         for vlans in range(self.vdevices):
             vlan_num = vlans + 1
@@ -85,6 +99,7 @@ class Trunker:
         return match_names
         
     def delete(self):
+        self.log_creation()
         match_names = self.get_vlan_names()
         for device in match_names:
             delete_vlan = subprocess.Popen(["ip", "link", "delete", device])
@@ -95,6 +110,7 @@ class Trunker:
         logging.info("Moved /etc/network/interfaces.orig -> /etc/network/interfaces")
 
     def from_file(self, input_file):
+        self.log_creation()
         self.interfaces_check()
         for line in input_file:
             vlan_device_id, device_ip, device_cidr = line.split(",")[0:3] 
