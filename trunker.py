@@ -13,7 +13,7 @@ class Trunker:
         self.interface = interface
         self.log_path = "root/site-data/logs/"
         self.if_path = "/etc/network/interfaces"
-        self.if_path_orig = if_path + ".orig"
+        self.if_path_orig = self.if_path + ".orig"
 
     def log_creation(self):
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
