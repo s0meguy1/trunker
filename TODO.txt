@@ -1,0 +1,4 @@
+# catch permission error -> suggest root
+# search for trunker.log
+# add vlan automation
+
