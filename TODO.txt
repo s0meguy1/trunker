@@ -2,3 +2,7 @@
 # search for trunker.log
 # add vlan automation
 
+# run lsmod | grep usb
+# lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
+# grep = subprocess.run(['grep', 'usb'], stdin=lsmod.stdout, check=True, text=True)
+
