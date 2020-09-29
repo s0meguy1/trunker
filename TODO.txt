@@ -6,3 +6,11 @@
 # lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
 # grep = subprocess.run(['grep', 'usb'], stdin=lsmod.stdout, check=True, text=True)
 
+
+# Capture subprocess.CalledProcessError
+# try:
+#     subprocess.run(['grep'], input=lsmod.stdout, capture_output=True, check=True, text=True)
+# except subprocess.CalledProcessError:
+#     print('No 8021q found')
+
+

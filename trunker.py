@@ -3,6 +3,7 @@
 import argparse
 import subprocess
 import logging
+import sys
 from IPy import IP
 
 
@@ -16,6 +17,16 @@ class Trunker:
         self.if_path_orig = self.if_path + ".orig"
 
     def log_creation(self):
+        # Run lsmod, capture output
+        lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
+        
+        try:
+            subprocess.run(['grep', '8021q'], input=lsmod.stdout, capture_output=True, check=True, text=True)
+        except subprocess.CalledProcessError:
+            print(f"It appears 8021q module is not loaded \n Run: 'modprobe 8021q'")
+            sys.exit()
+            
+        
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
             while True:
                 try:
