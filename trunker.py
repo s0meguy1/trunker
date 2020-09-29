@@ -15,8 +15,9 @@ class Trunker:
         self.log_path = "root/site-data/logs/"
         self.if_path = "/etc/network/interfaces"
         self.if_path_orig = self.if_path + ".orig"
+        self.border = "*" * 50
 
-    def log_creation(self):
+
         # Run lsmod, capture output
         lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
         
@@ -25,12 +26,22 @@ class Trunker:
         except subprocess.CalledProcessError:
             print(f"It appears 8021q module is not loaded \n Run: 'modprobe 8021q'")
             sys.exit()
-            
+
+
+
+    def log_creation(self):
+            # run updatedb, locate trunker.log, print them
+        update = subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
+        locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
+        locate.stdout.split('\n')
         
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
             while True:
                 try:
-                    print(f"{self.log_path} does not exist")
+                    print(f"{self.border}\n{self.log_path} does not exist.\nI found the following path(s) for trunker.log:")
+                    for i in locate.stdout.split('\n'):
+                        print(f"{i}")
+                    print(f"{self.border}\n")
                     log_file = input("Please enter a filepath for trunker.log: ")
                     logging.basicConfig(filename=log_file + "/trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
                     return print(f"{log_file}/trunker.log created. Logging started")
@@ -39,6 +50,7 @@ class Trunker:
                     continue
         else:
             logging.basicConfig(filename=self.log_path + "trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+
 
     def interfaces_check(self):
         try:
@@ -54,6 +66,7 @@ class Trunker:
         except ValueError:
             print(f"{self.if_path_orig} already exists")
             print(f"Appending devices to {self.if_path}")
+
 
     def add(self):
         self.log_creation()
@@ -106,6 +119,7 @@ class Trunker:
             else:
                 print(f"VLAN {vlan_device_name} created\nIP Address: {device_ip}/{device_cidr}")
                 logging.info(f"Virtual Device {vlan_device_name} created.  Assigned IP Address {device_ip}/{device_cidr}")
+
 
     def get_vlan_names(self):
         get_vlan_names = subprocess.Popen(["ls", "-a", "/proc/net/vlan"], stdout=subprocess.PIPE).communicate()[0]
