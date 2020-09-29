@@ -1,4 +1,3 @@
-#Test Update
 #!/usr/bin/python3
 
 import argparse
@@ -18,8 +17,10 @@ class Trunker:
         self.if_path_orig = self.if_path + ".orig"
         self.border = "*" * 50
 
+        # Run 'updatedb'
+        subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
 
-        # Run lsmod, capture output
+        # Run lsmod, capture output, grep for '8021q'
         lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
         
         try:
@@ -31,23 +32,27 @@ class Trunker:
 
 
     def log_creation(self):
-            # run updatedb, locate trunker.log, print them
-        update = subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
+        #  locate trunker.log
         locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
-        locate.stdout.split('\n')
         
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
             while True:
                 try:
                     print(f"{self.border}\n{self.log_path} does not exist.\nI found the following path(s) for trunker.log:")
+                    # Print trunker.log locations
                     for i in locate.stdout.split('\n'):
                         print(f"{i}")
                     print(f"{self.border}\n")
                     log_file = input("Please enter a filepath for trunker.log: ")
-                    logging.basicConfig(filename=log_file + "/trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
-                    return print(f"{log_file}/trunker.log created. Logging started")
+                    if len(log_file) <= 0:
+                        raise ValueError
+                    logging.basicConfig(filename=log_file + "trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+                    return print(f"{log_file}trunker.log created. Logging started")
                 except FileNotFoundError:
                     print(f"{log_file} does not exist. Enter another")
+                    continue
+                except ValueError:
+                    print(f"Filepath must not be blank!\n\n")
                     continue
         else:
             logging.basicConfig(filename=self.log_path + "trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
@@ -69,9 +74,17 @@ class Trunker:
             print(f"Appending devices to {self.if_path}")
 
 
+    def vlan_search(self):
+        logging.info(f"Beginning Search For VLAN tags on: {self.interface}")
+        print(f"Beginning search for VLAN tags on: {self.interface}")
+        tshark = subprocess.run(['tshark', '-O STP', '-a', 'duration:5', '-F k12text', '>', 'tsharkDump.txt'],
+                                 capture_output=True, check=True, text=True)
+
+
     def add(self):
         self.log_creation()
         self.interfaces_check()
+        self.vlan_search()
         for vlans in range(self.vdevices):
             vlan_num = vlans + 1
 
@@ -224,6 +237,7 @@ class Trunker:
 
 
 def main():
+    print('BETA -- TESTING AUTOMATED VLANS')
     parser = argparse.ArgumentParser(description="Use to add/remove VLAN ID to default 'eth0' interface", formatter_class=argparse.RawDescriptionHelpFormatter)
     manual_group = parser.add_mutually_exclusive_group()
     manual_group.add_argument("-a", "--add", action="store_true", help="Add a single VLAN device. Combine with -n to create multiple")
