@@ -2,5 +2,4 @@
 # catch ctrl+c
 # add options to user to pick trunker.log path, or create a new one
 # add vlan automation
-
-
+# fix interface option

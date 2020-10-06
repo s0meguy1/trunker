@@ -24,9 +24,8 @@ class Trunker:
         try:
             subprocess.run(['grep', '8021q'], input=lsmod.stdout, capture_output=True, check=True, text=True)
         except subprocess.CalledProcessError:
-            print(f"It appears 8021q module is not loaded \n Run: 'modprobe 8021q'")
+            print(f"{self.border}\nIt appears 8021q module is not loaded \n Run: 'modprobe 8021q'\n{self.border}")
             sys.exit()
-
 
 
     def log_creation(self):
@@ -34,17 +33,24 @@ class Trunker:
         update = subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
         locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
         locate.stdout.split('\n')
+
+        # Run 'clear'
+        subprocess.run(['clear'])
         
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
             while True:
                 try:
-                    print(f"{self.border}\n{self.log_path} does not exist.\nI found the following path(s) for trunker.log:")
+                    print(f"{self.border}\n{self.log_path} does not exist.\n\nExisting trunker.log has been found at the following path(s):")
                     for i in locate.stdout.split('\n'):
                         print(f"{i}")
                     print(f"{self.border}\n")
                     log_file = input("Please enter a filepath for trunker.log: ")
-                    logging.basicConfig(filename=log_file + "/trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
-                    return print(f"{log_file}/trunker.log created. Logging started")
+                    if log_file.endswith('/'):
+                        logging.basicConfig(filename=log_file + "trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+                        return print(f"{log_file}trunker.log created. Logging started")    
+                    else:
+                        logging.basicConfig(filename=log_file + "/trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
+                        return print(f"{log_file}/trunker.log created. Logging started")
                 except FileNotFoundError:
                     print(f"{log_file} does not exist. Enter another")
                     continue
@@ -62,7 +68,7 @@ class Trunker:
                 subprocess.Popen(["cp", "-p", self.if_path, self.if_path_orig]).communicate()
                 logging.info(f"{self.if_path_orig} does not exist")
                 logging.info(f"Copied {self.if_path} -> {self.if_path_orig}")
-                print(f"{self.if_path} found.  Creating backup at {self.if_path_orig}")
+                print(f"{self.if_path} found. Creating backup at {self.if_path_orig}")
         except ValueError:
             print(f"{self.if_path_orig} already exists")
             print(f"Appending devices to {self.if_path}")
@@ -81,7 +87,7 @@ class Trunker:
                         if "eth0." + str(vlan_device_id) in self.get_vlan_names():
                             raise NameError
                 except ValueError:
-                    print("Invalid input.  Must be an integer")
+                    print("Invalid input. Must be an integer")
                     continue
                 except NameError:
                     print(f"VLAN ID {vlan_device_id} Already Exist. Enter another")
@@ -118,7 +124,7 @@ class Trunker:
                 return print("Virtual Device already exists. Try running ./trunker.py -r")
             else:
                 print(f"VLAN {vlan_device_name} created\nIP Address: {device_ip}/{device_cidr}")
-                logging.info(f"Virtual Device {vlan_device_name} created.  Assigned IP Address {device_ip}/{device_cidr}")
+                logging.info(f"Virtual Device {vlan_device_name} created. Assigned IP Address {device_ip}/{device_cidr}")
 
 
     def get_vlan_names(self):
@@ -221,6 +227,15 @@ class Trunker:
 
         return vlan_device_name
 
+    def listen_for_vlans(self):
+        self.log_creation()
+        self.interfaces_check()
+        # debug - remove
+        print('Starting PCAP collection')
+        tshark = subprocess.run(['tshark', '-O STP', '-F', 'k12text', '-a', 'duration:5'], capture_output=True, check=True, text=True)
+        # debug - remove
+        print('PCAP collection done. Printing stdout')
+        print(tshark.stdout)
 
 def main():
     parser = argparse.ArgumentParser(description="Use to add/remove VLAN ID to default 'eth0' interface", formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -229,8 +244,9 @@ def main():
     manual_group.add_argument("-r", "--rem", action="store_true", help="Remove all VLAN devices from /proc/net/vlan and /etc/network/interfaces")
     file_group = parser.add_mutually_exclusive_group()
     file_group.add_argument("-n", "--num", type=int, default=1, help="Number of VLAN devices needed (default: 1)")
-    file_group.add_argument("-f", "--file", help="""Adds VLAN id's from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8""", type=argparse.FileType('r'))
+    file_group.add_argument("-f", "--file", help="Adds VLAN devices from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8", type=argparse.FileType('r'))
     parser.add_argument("-i", "--inter", default="eth0", help="Specify which interface to add VLAN to")
+    parser.add_argument("-l", action="store_true", dest="listen", help="Collect PCAP, if VLAN traffic is identified, attempt to add VLAN devices")
     args = parser.parse_args()
 
     vlan_trunk = Trunker(args.num, args.inter)
@@ -241,8 +257,10 @@ def main():
         vlan_trunk.delete()
     elif args.file:
         vlan_trunk.from_file(args.file)
+    elif args.listen:
+        vlan_trunk.listen_for_vlans()
     else:
-        print("usage: trunker [-h] [-a ADD | -r REM | -f FILE] [-i INTER] [-n NUM]")
+        print("usage: trunker [-h] [-a ADD [-n NUM] | -r REM | -f FILE] [-i INTER] [-l LISTEN]")
         print("-h, --help .... show help message:")
 
 
