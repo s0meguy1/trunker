@@ -1,5 +1,11 @@
 # catch permission error -> suggest root
 # catch ctrl+c
 # add options to user to pick trunker.log path, or create a new one
+#
 # add vlan automation
+# for i in tshark_list:
+# 	if re.findall( r'[0-9]+(?:\.[0-9]+){3}', i):
+#		 if 'Src: ' in i:
+# 			print(i.split(' ')[2])
+#
 # fix interface option

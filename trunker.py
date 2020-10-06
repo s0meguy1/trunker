@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import logging
 import sys
+import re
 from IPy import IP
 
 
@@ -232,10 +233,31 @@ class Trunker:
         self.interfaces_check()
         # debug - remove
         print('Starting PCAP collection')
-        tshark = subprocess.run(['tshark', '-O STP', '-F', 'k12text', '-a', 'duration:5'], capture_output=True, check=True, text=True)
+        # debug - remove
+        tshark = subprocess.run(['tshark', '-F', 'k12text', '-a', 'duration:5'], capture_output=True, check=True, text=True)
+        # run tshark, capture pcap in tshark variable
+        # tshark = subprocess.run(['tshark', '-O STP', '-F', 'k12text', '-a', 'duration:5'], capture_output=True, check=True, text=True)
         # debug - remove
         print('PCAP collection done. Printing stdout')
         print(tshark.stdout)
+        # debug - remove
+        print('Listing IPv4 Addresses found')
+        # create a list and search for IPv4 address
+        tshark_list = tshark.stdout.split(',')
+        ip_list = []
+        for i in tshark_list:
+            if re.findall( r'[0-9]+(?:\.[0-9]+){3}', i):
+                if 'Src: ' in i:
+                    print(i.split(' ')[2])
+                else:
+                    for x in i.split(' '):
+                        for ip in re.findall(r'[0-9]+(?:\.[0-9]+){3}', x):
+                            if ip not in ip_list:
+                                ip_list.append(ip)
+        for uniq_ip in sorted(ip_list):
+            print(uniq_ip)
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Use to add/remove VLAN ID to default 'eth0' interface", formatter_class=argparse.RawDescriptionHelpFormatter)
