@@ -6,6 +6,7 @@ import logging
 import sys
 import re
 from IPy import IP
+import socket
 
 
 class Trunker:
@@ -257,8 +258,87 @@ class Trunker:
         for uniq_ip in sorted(ip_list):
             print(uniq_ip)
 
+class allencompassing:
 
+    def change_mac(selected_interface, new_mac):
+        print("Changing MAC address for " + selected_interface + " to " + new_mac)
+        subprocess.call(["ip", "link", "set", "dev", selected_interface, "down"])
+        subprocess.call(["macchanger", new_mac, selected_interface])
+        subprocess.call(["ip", "link", "set", "dev", selected_interface, "up"])
+    
+    def list_interfaces(self):
+        interfaces = socket.if_nameindex()
+        print("Here's a list of current interfaces")
+        interfaces = socket.if_nameindex()
+        newinterface = []
+        for i in interfaces:
+            tempmac = subprocess.check_output(['cat', '/sys/class/net/' + str(i[1]) + '/address']).strip().decode("utf-8")
+            newinterface.append(tuple((i[0], str(i[1]), str(tempmac))))
+        for i in newinterface:
+            print(str(i[0]) + " " + str(i[1]) + " " + str(i[2]))
+        return newinterface
 
+def wizardloop():
+    Interface_info = allencompassing()
+    current_int = Interface_info.list_interfaces()
+    print("Which interface would you like to change the MAC on?")
+    inputtest = input()
+    for i in current_int:
+        try:
+#            while True:
+            if str(inputtest) == str(i[0]):
+                while True:
+                    print("What is the new MAC would you like to change it too?")
+                    newmac = input()
+                    p = re.compile(r'(?:[0-9a-fA-F]:?){12}')
+                    if re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", str(newmac).lower()):
+                        break
+                    else:
+                        print("That is not a valid MAC address...")
+                        continue
+                Interface_info.change_mac(i[1], str(newmac).lower())
+                print("Current interface MAC's:\n")
+                current_int = Interface_info.list_interfaces()
+                while True:
+                    try:
+                        print("\nWould you like to do more? y\\n")
+                        inputtest = input()
+                    except ValueError:
+                        print("Sorry, I didn't understand that.")
+                        continue
+                    if str(inputtest) == "Y" or str(inputtest) == "y" or str(inputtest) == "n" or str(inputtest) == "N":
+                        break
+                    else:
+                        print("You entered: \n" + str(inputtest) + "\nPlease enter yY or nN only, I can keep at this all day, I'm a program")
+                        continue
+                if str(inputtest) == "y" or str(inputtest) == "Y":
+                    wizardloop()
+                elif str(inputtest) == "n" or str(inputtest) == "N":
+                    exit()
+                else:
+                    print("That's not an option buddy, exiting...")
+                    exit()
+        except KeyboardInterrupt:
+            exit()
+    try:
+        print("Do you need to set the VLAN's for any of the interfaces? y//n")
+        inputtest = input()
+        if str(inputtest) == "y" or str(inputtest) == "Y":
+            print("Which interface would you like to set VLAN's on?")
+            inputtest = input()
+            current_int = Interface_info.list_interfaces()
+            for i in current_int:
+                if str(inputtest) == str(i[0]):
+                    trunker_normal = Trunker(1, str(i[1]))
+                    print("If no error messages were received, VLAN's set!\nHere's the list of devices currently:")
+                    current_int = Interface_info.list_interfaces()
+                    print("Run: trunker -r to remove created VLAN's")
+                    exit()
+        else:
+            print("Bye bye!")
+            exit()
+    except:
+        exit()
 def main():
     parser = argparse.ArgumentParser(description="Use to add/remove VLAN ID to default 'eth0' interface", formatter_class=argparse.RawDescriptionHelpFormatter)
     manual_group = parser.add_mutually_exclusive_group()
@@ -269,10 +349,11 @@ def main():
     file_group.add_argument("-f", "--file", help="Adds VLAN devices from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8", type=argparse.FileType('r'))
     parser.add_argument("-i", "--inter", default="eth0", help="Specify which interface to add VLAN to")
     parser.add_argument("-l", action="store_true", dest="listen", help="Collect PCAP, if VLAN traffic is identified, attempt to add VLAN devices")
+    wizard.parser.add_mutually_exclusive_group()
+    wizard.add_argument("-w", "--wizard", action="store_true", help="Summon a wizard to help you walk through the steps of setting up a VLAN")
     args = parser.parse_args()
 
     vlan_trunk = Trunker(args.num, args.inter)
-
     if args.add:
         vlan_trunk.add()
     elif args.rem:
@@ -281,6 +362,8 @@ def main():
         vlan_trunk.from_file(args.file)
     elif args.listen:
         vlan_trunk.listen_for_vlans()
+    elif args.wizard:
+        vlan_trunk.wizardloop()
     else:
         print("usage: trunker [-h] [-a ADD [-n NUM] | -r REM | -f FILE] [-i INTER] [-l LISTEN]")
         print("-h, --help .... show help message:")
