@@ -22,7 +22,7 @@ class Trunker:
 
         # Run lsmod, capture output
         lsmod = subprocess.run(['lsmod'], capture_output=True, check=True, text=True)
-        
+
         try:
             subprocess.run(['grep', '8021q'], input=lsmod.stdout, capture_output=True, check=True, text=True)
         except subprocess.CalledProcessError:
@@ -33,12 +33,22 @@ class Trunker:
     def log_creation(self):
             # run updatedb, locate trunker.log, print them
         update = subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
-        locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
+        # Needed to modify to work on  test machine
+        try:
+            locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
+        except:
+            subprocess.run(['touch', '/tmp/trunker.log'], capture_output=True, check=True, text=True)
+            subprocess.run(['updatedb'], capture_output=True, check=True, text=True)
+            locate = subprocess.run(['locate', 'trunker.log'], capture_output=True, check=True, text=True)
+        #End of mods
         locate.stdout.split('\n')
 
         # Run 'clear'
         subprocess.run(['clear'])
-        
+        try:
+            subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]
+        except:
+            log_path = "/tmp/"
         if len(subprocess.Popen(["ls", self.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[1]) > 0:
             while True:
                 try:
@@ -49,7 +59,7 @@ class Trunker:
                     log_file = input("Please enter a filepath for trunker.log: ")
                     if log_file.endswith('/'):
                         logging.basicConfig(filename=log_file + "trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
-                        return print(f"{log_file}trunker.log created. Logging started")    
+                        return print(f"{log_file}trunker.log created. Logging started")
                     else:
                         logging.basicConfig(filename=log_file + "/trunker.log", format="%(asctime)s %(message)s", level=logging.DEBUG, datefmt="%m/%d/%Y %H:%M:%S")
                         return print(f"{log_file}/trunker.log created. Logging started")
@@ -260,12 +270,12 @@ class Trunker:
 
 class allencompassing:
 
-    def change_mac(selected_interface, new_mac):
+    def change_mac(self, selected_interface, new_mac):
         print("Changing MAC address for " + selected_interface + " to " + new_mac)
         subprocess.call(["ip", "link", "set", "dev", selected_interface, "down"])
-        subprocess.call(["macchanger", new_mac, selected_interface])
+        subprocess.call(["macchanger", "--mac="+new_mac, selected_interface])
         subprocess.call(["ip", "link", "set", "dev", selected_interface, "up"])
-    
+
     def list_interfaces(self):
         interfaces = socket.if_nameindex()
         print("Here's a list of current interfaces")
@@ -301,7 +311,7 @@ def wizardloop():
                 current_int = Interface_info.list_interfaces()
                 while True:
                     try:
-                        print("\nWould you like to do more? y\\n")
+                        print("\nWould you like to chamge more MAC's (y) or move on to setting VLans (n)? y\\n")
                         inputtest = input()
                     except ValueError:
                         print("Sorry, I didn't understand that.")
@@ -314,7 +324,7 @@ def wizardloop():
                 if str(inputtest) == "y" or str(inputtest) == "Y":
                     wizardloop()
                 elif str(inputtest) == "n" or str(inputtest) == "N":
-                    exit()
+                    break
                 else:
                     print("That's not an option buddy, exiting...")
                     exit()
@@ -325,12 +335,20 @@ def wizardloop():
         inputtest = input()
         if str(inputtest) == "y" or str(inputtest) == "Y":
             print("Which interface would you like to set VLAN's on?")
-            inputtest = input()
             current_int = Interface_info.list_interfaces()
+            inputtest = input()
             for i in current_int:
                 if str(inputtest) == str(i[0]):
-                    trunker_normal = Trunker(1, str(i[1]))
-                    print("If no error messages were received, VLAN's set!\nHere's the list of devices currently:")
+                    #add: Adds VLAN devices from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8
+#                    print("What is the VLAN ID you want to use?")
+#                    vlaninput = input()
+#                    print("What is the IP you would like to use?")
+#                    ipinput = input()
+#                    print("What is the subnet mask you would like to use? Ea. /24 or /23")
+#                    maskinput = input()
+#                    trunker_normal = Trunker(1, str(i[1]))
+                    Trunker(1, str(i[1])).add()
+                    print("If no error messages were received, VLAN's set!\n")
                     current_int = Interface_info.list_interfaces()
                     print("Run: trunker -r to remove created VLAN's")
                     exit()
@@ -349,7 +367,7 @@ def main():
     file_group.add_argument("-f", "--file", help="Adds VLAN devices from a comma delimitted, multilined file.\nExample:\n1,192.168.1.1,24\n2,192.168.2.1,8", type=argparse.FileType('r'))
     parser.add_argument("-i", "--inter", default="eth0", help="Specify which interface to add VLAN to")
     parser.add_argument("-l", action="store_true", dest="listen", help="Collect PCAP, if VLAN traffic is identified, attempt to add VLAN devices")
-    wizard.parser.add_mutually_exclusive_group()
+    wizard = parser.add_mutually_exclusive_group()
     wizard.add_argument("-w", "--wizard", action="store_true", help="Summon a wizard to help you walk through the steps of setting up a VLAN")
     args = parser.parse_args()
 
@@ -363,7 +381,7 @@ def main():
     elif args.listen:
         vlan_trunk.listen_for_vlans()
     elif args.wizard:
-        vlan_trunk.wizardloop()
+        wizardloop()
     else:
         print("usage: trunker [-h] [-a ADD [-n NUM] | -r REM | -f FILE] [-i INTER] [-l LISTEN]")
         print("-h, --help .... show help message:")
